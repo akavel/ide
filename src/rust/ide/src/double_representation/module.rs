@@ -21,6 +21,49 @@ use serde::Serialize;
 
 
 
+// ==============
+// === Errors ===
+// ==============
+
+#[derive(Clone,Debug,Fail)]
+#[fail(display="Import `{}` was not found in the module.",_0)]
+#[allow(missing_docs)]
+pub struct ImportNotFound(pub ImportInfo);
+
+#[derive(Clone,Copy,Debug,Fail)]
+#[fail(display="Line index is out of bounds.")]
+#[allow(missing_docs)]
+pub struct LineIndexOutOfBounds;
+
+/// Happens if an empty segments list is provided as qualified module name.
+#[derive(Clone,Copy,Debug,Fail)]
+#[fail(display="No name segments were provided.")]
+pub struct EmptyName;
+
+#[allow(missing_docs)]
+#[derive(Clone,Copy,Debug,Fail)]
+pub enum InvalidQualifiedName {
+    #[fail(display="No module segment in module's qualified name.")]
+    NoModuleSegment,
+}
+
+#[allow(missing_docs)]
+#[derive(Fail,Clone,Debug)]
+#[fail(display="Cannot find method with pointer {:?}.",_0)]
+pub struct CannotFindMethod(language_server::MethodPointer);
+
+#[allow(missing_docs)]
+#[derive(Copy,Fail,Clone,Debug)]
+#[fail(display="Encountered an empty definition ID. It must contain at least one crumb.")]
+pub struct EmptyDefinitionId;
+
+#[allow(missing_docs)]
+#[derive(Fail,Clone,Debug)]
+#[fail(display="The definition with crumbs {:?} is not a direct child of the module.",_0)]
+pub struct NotDirectChild(ast::Crumbs);
+
+
+
 // ==========
 // === Id ===
 // ==========
@@ -60,13 +103,17 @@ impl Id {
         Self::new(segments).map_err(Into::into)
     }
 
-    /// Get the segments of the module's path. They correspond to the module's file parent
+    /// Get the segments of the module's path. They correspond to theQualifi module's file parent
     /// directories, relative to the project's main source directory.
     ///
     /// The names are ordered beginning with the root one. The last one is the direct parent of the
     /// target module's file. The module name itself is not included.
     pub fn parent_segments(&self) -> &[ReferentName] {
         &self.segments[..self.segments.len() - 1]
+    }
+
+    pub fn take_segments(self) -> Vec<ReferentName> {
+        self.segments
     }
 
     /// Get the name of a module identified by this value.
@@ -81,13 +128,6 @@ impl Id {
 // =====================
 // === QualifiedName ===
 // =====================
-
-#[allow(missing_docs)]
-#[derive(Clone,Copy,Debug,Fail)]
-pub enum InvalidQualifiedName {
-    #[fail(display="No module segment in qualified name.")]
-    NoModuleSegment,
-}
 
 /// Module's qualified name is used in some of the Language Server's APIs, like
 /// `VisualisationConfiguration`.
@@ -304,27 +344,6 @@ impl Display for ImportInfo {
 
 
 
-// ==============
-// === Errors ===
-// ==============
-
-#[derive(Clone,Debug,Fail)]
-#[fail(display="Import `{}` was not found in the module.",_0)]
-#[allow(missing_docs)]
-pub struct ImportNotFound(pub ImportInfo);
-
-#[derive(Clone,Copy,Debug,Fail)]
-#[fail(display="Line index is out of bounds.")]
-#[allow(missing_docs)]
-pub struct LineIndexOutOfBounds;
-
-/// Happens if an empty segments list is provided as qualified module name.
-#[derive(Clone,Copy,Debug,Fail)]
-#[fail(display="No name segments were provided.")]
-pub struct EmptyName;
-
-
-
 // ============
 // === Info ===
 // ============
@@ -506,27 +525,6 @@ pub enum Placement {
     /// Place before given definition;
     After(definition::Crumb),
 }
-
-
-
-// ==============
-// === Errors ===
-// ==============
-
-#[allow(missing_docs)]
-#[derive(Fail,Clone,Debug)]
-#[fail(display="Cannot find method with pointer {:?}.",_0)]
-pub struct CannotFindMethod(language_server::MethodPointer);
-
-#[allow(missing_docs)]
-#[derive(Copy,Fail,Clone,Debug)]
-#[fail(display="Encountered an empty definition ID. It must contain at least one crumb.")]
-pub struct EmptyDefinitionId;
-
-#[allow(missing_docs)]
-#[derive(Fail,Clone,Debug)]
-#[fail(display="The definition with crumbs {:?} is not a direct child of the module.",_0)]
-pub struct NotDirectChild(ast::Crumbs);
 
 
 

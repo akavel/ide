@@ -3,7 +3,8 @@
 use crate::prelude::*;
 
 use crate::constants::keywords;
-use crate::double_representation::module::QualifiedName;
+use crate::double_representation::module;
+use crate::double_representation::tp;
 use crate::model::module::MethodId;
 
 use data::text::TextLocation;
@@ -81,7 +82,7 @@ pub struct Entry {
     /// A type of suggestion.
     pub kind : Kind,
     /// A module where the suggested object is defined, represented as vector of segments.
-    pub module : QualifiedName,
+    pub module : module::QualifiedName,
     /// Argument lists of suggested object (atom or function). If the object does not take any
     /// arguments, the list is empty.
     pub arguments : Vec<Argument>,
@@ -90,24 +91,23 @@ pub struct Entry {
     /// A documentation associated with object.
     pub documentation : Option<String>,
     /// A type of the "self" argument. This field is `None` for non-method suggestions.
-    pub self_type : Option<String>,
+    pub self_type : Option<tp::QualifiedName>,
     /// A scope where this suggestion is visible.
     pub scope : Scope,
 }
 
 impl Entry {
     /// Check if this entry has self type same as the given identifier.
-    pub fn has_self_type(&self, self_type:impl AsRef<str>) -> bool {
-        let self_type = self_type.as_ref();
-        self.self_type.as_ref().contains_if(|my_self_type| *my_self_type == self_type)
+    pub fn has_self_type(&self, self_type:&tp::QualifiedName) -> bool {
+        self.self_type.as_ref().contains(&self_type)
     }
 
     /// Returns the code which should be inserted to Searcher input when suggestion is picked.
-    pub fn code_to_insert(&self, current_module:Option<&QualifiedName>) -> String {
-        let module_name = self.module.name();
+    pub fn code_to_insert(&self, current_module:Option<&module::QualifiedName>) -> String {
+        let module_name = self.module.clone().into();
         if self.has_self_type(&module_name) {
             let module_var = if current_module.contains(&&self.module) {keywords::HERE}
-            else {module_name};
+            else {module_name.into()};
             format!("{}.{}",module_var,self.name)
         } else {
             self.name.clone()
@@ -138,7 +138,7 @@ impl Entry {
     }
 
     /// Checks if entry is visible at given location in a specific module.
-    pub fn is_visible_at(&self, module:&QualifiedName, location:TextLocation) -> bool {
+    pub fn is_visible_at(&self, module:&module::QualifiedName, location:TextLocation) -> bool {
         match &self.scope {
             Scope::Everywhere         => true,
             Scope::InModule   {range} => self.module == *module && range.contains(&location),
@@ -360,8 +360,8 @@ mod test {
 
     #[test]
     fn code_from_entry() {
-        let module         = QualifiedName::from_text("Project.Main").unwrap();
-        let another_module = QualifiedName::from_text("Project.AnotherModule").unwrap();
+        let module         = module::QualifiedName::from_text("Project.Main").unwrap();
+        let another_module = module::QualifiedName::from_text("Project.AnotherModule").unwrap();
         let atom_entry = Entry {
             name          : "Atom".to_string(),
             kind          : Kind::Atom,

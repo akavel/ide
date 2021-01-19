@@ -5,6 +5,7 @@ pub mod synchronized;
 
 pub use double_representation::module::Id;
 pub use double_representation::module::QualifiedName;
+pub use double_representation::tp::QualifiedName as TypeQualifiedName;
 
 use crate::prelude::*;
 
@@ -21,8 +22,8 @@ use flo_stream::Subscriber;
 use parser::api::SourceFile;
 use parser::api::ParsedSourceFile;
 use parser::Parser;
-use serde::Serialize;
 use serde::Deserialize;
+use serde::Serialize;
 
 
 
@@ -395,7 +396,7 @@ where f32 : Div<T,Output=f32>,
 #[allow(missing_docs)]
 pub struct MethodId {
     pub module          : QualifiedName,
-    pub defined_on_type : String,
+    pub defined_on_type : TypeQualifiedName,
     pub name            : String,
 }
 
