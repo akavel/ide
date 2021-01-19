@@ -239,6 +239,18 @@ impl From<ReferentName> for String {
     }
 }
 
+impl PartialEq<String> for ReferentName {
+    fn eq(&self, other:&String) -> bool {
+        &self.0 == other
+    }
+}
+
+impl PartialEq<&str> for ReferentName {
+    fn eq(&self, other:&&str) -> bool {
+        &self.0 == other
+    }
+}
+
 
 
 // ======================

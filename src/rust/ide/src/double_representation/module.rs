@@ -7,9 +7,9 @@ use crate::double_representation::definition;
 use crate::double_representation::definition::DefinitionProvider;
 use crate::double_representation::identifier;
 use crate::double_representation::identifier::Identifier;
-use crate::double_representation::identifier::NormalizedName;
 use crate::double_representation::identifier::LocatedName;
 use crate::double_representation::identifier::ReferentName;
+use crate::double_representation::tp;
 
 use ast::crumbs::ChildAst;
 use ast::crumbs::ModuleCrumb;
@@ -112,6 +112,7 @@ impl Id {
         &self.segments[..self.segments.len() - 1]
     }
 
+    /// Consume the [`Id`] and returns the inner representation of segments.
     pub fn take_segments(self) -> Vec<ReferentName> {
         self.segments
     }
@@ -130,7 +131,8 @@ impl Id {
 // =====================
 
 /// Module's qualified name is used in some of the Language Server's APIs, like
-/// `VisualisationConfiguration`.
+/// `VisualisationConfiguration`. Logically it is a special case of [`tp::QualifiedName`] and has
+/// defined `PartialEq<tp::QualifiedName`.
 ///
 /// Qualified name is constructed as follows:
 /// `ProjectName.<directories_between_src_and_enso_file>.<file_without_ext>`
@@ -141,8 +143,10 @@ impl Id {
 #[serde(into="String")]
 #[serde(try_from="String")]
 pub struct QualifiedName {
-    project_name : ReferentName,
-    id           : Id
+    /// The first segment in the full qualified name.
+    pub project_name : ReferentName,
+    /// The module id: all segments in full qualified name but the first (which is a project name).
+    pub id           : Id
 }
 
 impl QualifiedName {
@@ -274,6 +278,14 @@ impl Display for QualifiedName {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let text = String::from(self);
         fmt::Display::fmt(&text,f)
+    }
+}
+
+impl PartialEq<tp::QualifiedName> for QualifiedName {
+    fn eq(&self, other:&tp::QualifiedName) -> bool {
+        self.project_name             == other.project_name &&
+            self.id.parent_segments() == other.module_segments.as_slice() &&
+            self.id.name().as_str()   == &other.name
     }
 }
 
@@ -621,19 +633,20 @@ pub fn locate
 /// The `module_name` parameter is the name of the module that contains `ast`. It affects how the
 /// `here` keyword is resolved.
 pub fn lookup_method
-(module_name:&ReferentName, ast:&known::Module, method:&language_server::MethodPointer)
+(module_name:&QualifiedName, ast:&known::Module, method:&language_server::MethodPointer)
 -> FallibleResult<definition::Id> {
-    let normalized_typename        = NormalizedName::new(&method.defined_on_type);
-    let accept_here_methods        = module_name.normalized() == normalized_typename;
-    let module_name                = QualifiedName::try_from(method)?;
-    let implicit_extension_allowed = method.defined_on_type == module_name.to_string();
+    // TODO shall tp::QualifiedName be normalized by default?
+    let qualified_typename         = tp::QualifiedName::from_text(&method.defined_on_type)?;
+    let accept_here_methods        = module_name == &qualified_typename;
+    let method_module_name         = QualifiedName::try_from(method)?;
+    let implicit_extension_allowed = method.defined_on_type == method_module_name.to_string();
     for child in ast.def_iter() {
         let child_name   = &child.name.item;
         let name_matches = child_name.name.item == method.name;
         let type_matches = match child_name.extended_target.as_slice() {
             []         => implicit_extension_allowed,
             [typename] => {
-                let explicit_type_matching  = typename.item == method.defined_on_type;
+                let explicit_type_matching  = typename.item == qualified_typename.name;
                 let here_extension_matching = typename.item == HERE && accept_here_methods;
                 explicit_type_matching || here_extension_matching
             }
@@ -746,7 +759,7 @@ mod tests {
     #[wasm_bindgen_test]
     fn implicit_method_resolution() {
         let parser         = parser::Parser::new_or_panic();
-        let module_name    = ReferentName::new("Main").unwrap();
+        let module_name    = QualifiedName::from_segments("ProjectName",&["Main"]).unwrap();
         let expect_find    = |method:&MethodPointer, code,expected:&definition::Id| {
             let module = parser.parse_module(code,default()).unwrap();
             let result = lookup_method(&module_name,&module,method);
@@ -768,7 +781,7 @@ mod tests {
         // === Lookup the Main (local module type) extension method ===
 
         let ptr = MethodPointer {
-            defined_on_type : "Main".into(),
+            defined_on_type : "ProjectName.Main".into(),
             module          : "ProjectName.Main".into(),
             name            : "foo".into(),
         };
@@ -783,7 +796,7 @@ mod tests {
         let id = definition::Id::new_single_crumb(DefinitionName::new_method("here","foo"));
         expect_find(&ptr,"here.foo a b = a + b",&id);
         // Matching name but extending wrong type.
-        expect_not_found(&ptr,"Int.foo a b = a + b");
+        expect_not_found(&ptr,"Number.foo a b = a + b");
         // Mismatched name.
         expect_not_found(&ptr,"bar a b = a + b");
 
@@ -791,14 +804,14 @@ mod tests {
         // === Lookup the Int (non-local type) extension method ===
 
         let ptr = MethodPointer {
-            defined_on_type : "Int".into(),
+            defined_on_type : "Base.Main.Number".into(),
             module          : "ProjectName.Main".into(),
             name            : "foo".into(),
         };
 
         expect_not_found(&ptr,"foo a b = a + b");
         let id = definition::Id::new_single_crumb(DefinitionName::new_method("Int","foo"));
-        expect_find(&ptr,"Int.foo a b = a + b",&id);
+        expect_find(&ptr,"Number.foo a b = a + b",&id);
         expect_not_found(&ptr,"Text.foo a b = a + b");
         expect_not_found(&ptr,"here.foo a b = a + b");
         expect_not_found(&ptr,"bar a b = a + b");
