@@ -810,7 +810,7 @@ mod tests {
         };
 
         expect_not_found(&ptr,"foo a b = a + b");
-        let id = definition::Id::new_single_crumb(DefinitionName::new_method("Int","foo"));
+        let id = definition::Id::new_single_crumb(DefinitionName::new_method("Number","foo"));
         expect_find(&ptr,"Number.foo a b = a + b",&id);
         expect_not_found(&ptr,"Text.foo a b = a + b");
         expect_not_found(&ptr,"here.foo a b = a + b");

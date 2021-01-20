@@ -36,7 +36,7 @@ pub mod mock {
         pub const MODULE_NAME     : &str     = "Mock_Module";
         pub const CODE            : &str     = "main = \n    2 + 2";
         pub const DEFINITION_NAME : &str     = "main";
-        pub const TYPE_NAME       : &str     = "Mock_Type";
+        pub const TYPE_NAME       : &str     = "MockProject.Mock_Module.Mock_Type";
         pub const MAIN_FINISH     : Position = Position {line:1, character:9};
         pub const CONTEXT_ID      : Uuid     = Uuid::from_u128(0xFE);
 

@@ -1087,7 +1087,7 @@ pub mod test {
             info!(DefaultDebugLogger::new("Test"),"12");
             let database    = Rc::new(SuggestionDatabase::new_empty(&logger));
             info!(DefaultDebugLogger::new("Test"),"13");
-            let module_name = QualifiedName::from_text(MODULE_NAME).unwrap();
+            let module_name = QualifiedName::from_segments(PROJECT_NAME, &[MODULE_NAME]).unwrap();
             info!(DefaultDebugLogger::new("Test"),"14");
             let searcher = Searcher {
                 graph,logger,database,
